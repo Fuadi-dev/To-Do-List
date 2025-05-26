@@ -1,219 +1,642 @@
-<!doctype html>
+{{-- filepath: d:\laragon\www\To-Do-List\backend\resources\views\index.blade.php --}}
+<!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Task Manager</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>TodoApp - Kelola Tugas Anda</title>
     @vite('resources/css/app.css')
-    <!-- Heroicons (optional) -->
-    <script src="https://cdn.jsdelivr.net/npm/@heroicons/vue@2.0.16/outline.min.js"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
-
-<body class="bg-gray-50 min-h-screen">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <!-- Navigation -->
-        <nav class="border-b border-gray-200 py-6">
-            <div class="flex items-center justify-between">
-                <h1 class="text-3xl font-bold text-indigo-600">TaskMaster</h1>
-                <div class="flex items-center space-x-4">
-                    <button class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors">
-                        + New Task
-                    </button>
-                    <div class="relative">
-                        <img class="h-10 w-10 rounded-full bg-gray-300" src="https://ui-avatars.com/api/?name=User" alt="User profile" />
-                    </div>
-                </div>
-            </div>
-        </nav>
-
-        <!-- Header -->
-        <header class="py-8">
-            <div class="md:flex md:items-center md:justify-between">
-                <div class="min-w-0 flex-1">
-                    <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl">
-                        My Tasks
-                    </h2>
-                </div>
-            </div>
-        </header>
-
-        <!-- Filters -->
-        <div class="mb-8 bg-white shadow overflow-hidden sm:rounded-lg p-4">
-            <div class="flex flex-wrap items-center gap-4">
-                <div class="w-full sm:w-auto">
-                    <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-                    <select id="status" name="status" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                        <option value="all">All</option>
-                        <option value="belum_dikerjakan">Belum Dikerjakan</option>
-                        <option value="proses">Dalam Proses</option>
-                        <option value="selesai">Selesai</option>
-                    </select>
-                </div>
-                
-                <div class="w-full sm:w-auto">
-                    <label for="category" class="block text-sm font-medium text-gray-700">Category</label>
-                    <select id="category" name="category" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                        <option value="all">All Categories</option>
-                        <option value="1">Work</option>
-                        <option value="2">Personal</option>
-                        <option value="3">Study</option>
-                    </select>
-                </div>
-                
-                <div class="w-full sm:w-auto">
-                    <label for="date" class="block text-sm font-medium text-gray-700">Due Date</label>
-                    <input type="date" name="date" id="date" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                </div>
-                
-                <div class="w-full sm:w-auto flex items-end">
-                    <button type="button" class="mt-1 bg-indigo-100 text-indigo-700 px-4 py-2 rounded-md hover:bg-indigo-200 transition-colors">
-                        Apply Filters
-                    </button>
-                </div>
+<body class="bg-gray-50 min-h-screen" x-data="todoApp()">
+    @include('components.navbar')
+    
+    <!-- Alert Messages -->
+    @if(session('success'))
+        <div x-data="{ show: true }" x-show="show" x-transition class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
+                <span class="block sm:inline">{{ session('success') }}</span>
+                <span class="absolute top-0 bottom-0 right-0 px-4 py-3" @click="show = false">
+                    <i class="fas fa-times cursor-pointer"></i>
+                </span>
             </div>
         </div>
+    @endif
 
-        <!-- Task Grid -->
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-10">
-            <!-- Task Card 1 -->
-            <div class="bg-white shadow rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                <div class="bg-indigo-500 h-2"></div>
-                <div class="p-5">
-                    <div class="flex items-center justify-between">
-                        <span class="px-2 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded-full">Dalam Proses</span>
-                        <span class="text-sm text-gray-500">Due: 20 May 2025</span>
+    @if(session('error'))
+        <div x-data="{ show: true }" x-show="show" x-transition class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+                <span class="block sm:inline">{{ session('error') }}</span>
+                <span class="absolute top-0 bottom-0 right-0 px-4 py-3" @click="show = false">
+                    <i class="fas fa-times cursor-pointer"></i>
+                </span>
+            </div>
+        </div>
+    @endif
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header Section -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Daftar Tugas Anda</h1>
+            <p class="text-gray-600">Kelola dan pantau progres tugas harian Anda</p>
+        </div>
+
+        <!-- Search and Filter Section -->
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6" x-data="{ showFilters: false }">
+            <form method="GET" action="{{ route('home') }}" class="space-y-4">
+                <!-- Search Bar -->
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="flex-1">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" name="search" value="{{ $search }}" 
+                                   placeholder="Cari tugas berdasarkan judul atau deskripsi..."
+                                   class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
                     </div>
-                    <h3 class="mt-4 text-lg font-semibold text-gray-900">Buat Presentasi Proyek</h3>
-                    <p class="mt-2 text-sm text-gray-600 line-clamp-2">Menyiapkan slide presentasi untuk meeting dengan client besok pagi mengenai progress proyek website baru.</p>
-                    <div class="mt-4 flex items-center gap-2">
-                        <span class="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">Work</span>
-                        <span class="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">Urgent</span>
+                    <button type="button" @click="showFilters = !showFilters"
+                            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200">
+                        <i class="fas fa-filter mr-2"></i>Filter
+                    </button>
+                    <button type="submit" 
+                            class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200">
+                        <i class="fas fa-search mr-2"></i>Cari
+                    </button>
+                </div>
+
+                <!-- Advanced Filters -->
+                <div x-show="showFilters" x-transition class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-gray-200">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
+                        <select name="category_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">Semua Kategori</option>
+                            @foreach($categories as $category)
+                                <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
+                                    {{ $category->name }}
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div class="mt-4 flex justify-between items-center">
-                        <button class="text-sm text-indigo-600 hover:text-indigo-900">View Details</button>
-                        <div>
-                            <button class="p-1 rounded-full hover:bg-gray-100">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                                </svg>
-                            </button>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Urutkan Berdasarkan</label>
+                        <select name="sort_by" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="created_at" {{ $sortBy == 'created_at' ? 'selected' : '' }}>Tanggal Dibuat</option>
+                            <option value="judul_tugas" {{ $sortBy == 'judul_tugas' ? 'selected' : '' }}>Judul Tugas</option>
+                            <option value="tanggal_selesai" {{ $sortBy == 'tanggal_selesai' ? 'selected' : '' }}>Deadline</option>
+                            <option value="status" {{ $sortBy == 'status' ? 'selected' : '' }}>Status</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Arah</label>
+                        <select name="sort_dir" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="asc" {{ $sortDir == 'asc' ? 'selected' : '' }}>A-Z / Terlama</option>
+                            <option value="desc" {{ $sortDir == 'desc' ? 'selected' : '' }}>Z-A / Terbaru</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Per Halaman</label>
+                        <select name="per_page" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="5" {{ $perPage == 5 ? 'selected' : '' }}>5</option>
+                            <option value="10" {{ $perPage == 10 ? 'selected' : '' }}>10</option>
+                            <option value="25" {{ $perPage == 25 ? 'selected' : '' }}>25</option>
+                            <option value="50" {{ $perPage == 50 ? 'selected' : '' }}>50</option>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Add Todo Button -->
+        <div class="mb-6">
+            <button @click="openAddModal()" 
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 inline-flex items-center">
+                <i class="fas fa-plus mr-2"></i>Tambah Tugas Baru
+            </button>
+        </div>
+
+        <!-- Todo Cards Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            @forelse($todos as $todo)
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-200">
+                    {{-- <!-- Todo Image -->
+                    @if($todo->foto_tugas)
+                        <div class="h-48 bg-gray-200 overflow-hidden cursor-pointer" @click="viewTodo({{ $todo->id }})">
+                            <img src="{{ asset('storage/' . $todo->foto_tugas) }}" 
+                                 alt="{{ $todo->judul_tugas }}"
+                                 class="w-full h-full object-cover">
+                        </div>
+                    @endif --}}
+
+                    <div class="p-6">
+                        <!-- Status Badge -->
+                        <div class="mb-3">
+                            @php
+                                $statusColors = [
+                                    'belum_dikerjakan' => 'bg-red-100 text-red-800',
+                                    'proses' => 'bg-yellow-100 text-yellow-800',
+                                    'selesai' => 'bg-green-100 text-green-800'
+                                ];
+                                $statusText = [
+                                    'belum_dikerjakan' => 'Belum Dikerjakan',
+                                    'proses' => 'Dalam Proses',
+                                    'selesai' => 'Selesai'
+                                ];
+                            @endphp
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusColors[$todo->status] ?? 'bg-gray-100 text-gray-800' }}">
+                                {{ $statusText[$todo->status] ?? $todo->status }}
+                            </span>
+                        </div>
+
+                        <!-- Todo Title -->
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2 cursor-pointer" @click="viewTodo({{ $todo->id }})">{{ $todo->judul_tugas }}</h3>
+                        
+                        <!-- Todo Description -->
+                        <p class="text-gray-600 text-sm mb-4 line-clamp-3">{{ Str::limit($todo->deskripsi_tugas, 100) }}</p>
+
+                        <!-- Categories -->
+                        @if($todo->categories->count() > 0)
+                            <div class="mb-4">
+                                <div class="flex flex-wrap gap-1">
+                                    @foreach($todo->categories as $category)
+                                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                                            {{ $category->name }}
+                                        </span>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        <!-- Deadline -->
+                        <div class="flex items-center text-sm text-gray-500 mb-4">
+                            <i class="fas fa-calendar-alt mr-2"></i>
+                            Deadline: {{ \Carbon\Carbon::parse($todo->tanggal_selesai)->format('d M Y') }}
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex justify-between items-center">
+                            <div class="flex space-x-3">
+                                <button @click="viewTodo({{ $todo->id }})" 
+                                        class="text-blue-600 hover:text-blue-800 transition-colors duration-200 p-2">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button @click="editTodo({{ $todo->id }})" 
+                                        class="text-indigo-600 hover:text-indigo-800 transition-colors duration-200 p-2">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button @click="deleteTodo({{ $todo->id }})" 
+                                        class="text-red-600 hover:text-red-800 transition-colors duration-200 p-2">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                            <span class="text-xs text-gray-400">
+                                {{ \Carbon\Carbon::parse($todo->created_at)->diffForHumans() }}
+                            </span>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Task Card 2 -->
-            <div class="bg-white shadow rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                <div class="bg-red-500 h-2"></div>
-                <div class="p-5">
-                    <div class="flex items-center justify-between">
-                        <span class="px-2 py-1 text-xs font-semibold bg-red-100 text-red-800 rounded-full">Belum Dikerjakan</span>
-                        <span class="text-sm text-gray-500">Due: 25 May 2025</span>
-                    </div>
-                    <h3 class="mt-4 text-lg font-semibold text-gray-900">Belajar Laravel 10</h3>
-                    <p class="mt-2 text-sm text-gray-600 line-clamp-2">Mempelajari fitur-fitur baru pada Laravel 10 dan implementasinya dalam pengembangan web.</p>
-                    <div class="mt-4 flex items-center gap-2">
-                        <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Study</span>
-                        <span class="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">Development</span>
-                    </div>
-                    <div class="mt-4 flex justify-between items-center">
-                        <button class="text-sm text-indigo-600 hover:text-indigo-900">View Details</button>
-                        <div>
-                            <button class="p-1 rounded-full hover:bg-gray-100">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
+            @empty
+                <div class="col-span-full text-center py-12">
+                    <i class="fas fa-tasks text-gray-300 text-6xl mb-4"></i>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">Belum ada tugas</h3>
+                    <p class="text-gray-500 mb-4">Mulai dengan menambahkan tugas pertama Anda!</p>
+                    <button @click="openAddModal()" 
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200">
+                        Tambah Tugas
+                    </button>
                 </div>
-            </div>
-
-            <!-- Task Card 3 -->
-            <div class="bg-white shadow rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                <div class="bg-green-500 h-2"></div>
-                <div class="p-5">
-                    <div class="flex items-center justify-between">
-                        <span class="px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full">Selesai</span>
-                        <span class="text-sm text-gray-500">Due: 15 May 2025</span>
-                    </div>
-                    <h3 class="mt-4 text-lg font-semibold text-gray-900">Database Migration</h3>
-                    <p class="mt-2 text-sm text-gray-600 line-clamp-2">Melakukan migrasi database dari server lama ke server baru dengan zero downtime.</p>
-                    <div class="mt-4 flex items-center gap-2">
-                        <span class="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">Work</span>
-                        <span class="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">Database</span>
-                    </div>
-                    <div class="mt-4 flex justify-between items-center">
-                        <button class="text-sm text-indigo-600 hover:text-indigo-900">View Details</button>
-                        <div>
-                            <button class="p-1 rounded-full hover:bg-gray-100">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            @endforelse
         </div>
 
         <!-- Pagination -->
-        <div class="flex items-center justify-between border-t border-gray-200 px-4 py-3 sm:px-6 mb-8">
-            <div class="flex flex-1 justify-between sm:hidden">
-                <a href="#" class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Previous</a>
-                <a href="#" class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Next</a>
+        @if($todos->hasPages())
+            <div class="flex justify-center">
+                {{ $todos->links() }}
             </div>
-            <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                <div>
-                    <p class="text-sm text-gray-700">
-                        Showing <span class="font-medium">1</span> to <span class="font-medium">3</span> of <span class="font-medium">12</span> tasks
-                    </p>
+        @endif
+    </div>
+
+    <!-- Add Todo Modal -->
+    <div x-show="showAddModal" x-transition.opacity class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-gray-900">Tambah Tugas Baru</h3>
+                    <button @click="closeAddModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
                 </div>
-                <div>
-                    <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-                        <a href="#" class="relative inline-flex items-center rounded-l-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 focus:z-20">
-                            <span class="sr-only">Previous</span>
-                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
-                            </svg>
-                        </a>
-                        <a href="#" aria-current="page" class="relative z-10 inline-flex items-center border border-indigo-500 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-600 focus:z-20">1</a>
-                        <a href="#" class="relative inline-flex items-center border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 focus:z-20">2</a>
-                        <a href="#" class="relative hidden items-center border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 focus:z-20 md:inline-flex">3</a>
-                        <a href="#" class="relative inline-flex items-center rounded-r-md border border-gray-300 bg-white px-2 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50 focus:z-20">
-                            <span class="sr-only">Next</span>
-                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-                            </svg>
-                        </a>
-                    </nav>
+                <form method="POST" action="{{ route('todo.add') }}" enctype="multipart/form-data" class="space-y-4">
+                    @csrf
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Foto Tugas</label>
+                        <input type="file" name="foto_tugas" accept="image/*"
+                               @change="previewAddImage($event)"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        
+                        <!-- Image Preview for Add Modal -->
+                        <div x-show="addImagePreview" class="mt-4">
+                            <div class="relative inline-block">
+                                <img :src="addImagePreview" alt="Preview" class="w-32 h-24 object-cover rounded-lg border-2 border-gray-300">
+                                <button type="button" @click="removeAddImagePreview()" 
+                                        class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Judul Tugas *</label>
+                        <input type="text" name="judul_tugas" required
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Deskripsi Tugas *</label>
+                        <textarea name="deskripsi_tugas" rows="4" required
+                                  class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Selesai *</label>
+                        <input type="date" name="tanggal_selesai" required min="{{ date('Y-m-d') }}"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Status *</label>
+                        <select name="status" required
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="belum_dikerjakan">Belum Dikerjakan</option>
+                            <option value="proses">Dalam Proses</option>
+                            <option value="selesai">Selesai</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
+                        <div class="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                            @foreach($categories as $category)
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="categories[]" value="{{ $category->id }}"
+                                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="ml-2 text-sm text-gray-700">{{ $category->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4 border-t">
+                        <button type="button" @click="closeAddModal()"
+                                class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors duration-200">
+                            Batal
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200">
+                            Simpan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Todo Modal -->
+    <div x-show="showEditModal" x-transition.opacity class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-gray-900">Edit Tugas</h3>
+                    <button @click="closeEditModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <form :action="`/todo/${selectedTodo.id}/edit`" method="POST" enctype="multipart/form-data" class="space-y-4">
+                    @csrf
+                    @method('PUT')
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Foto Tugas</label>
+                        <input type="file" name="foto_tugas" accept="image/*"
+                               @change="previewEditImage($event)"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        
+                        <!-- Current Image Display -->
+                        <div class="mt-3">
+                            <p class="text-sm text-gray-600 mb-2">Foto saat ini:</p>
+                            <div x-show="selectedTodo.foto_tugas && !editImagePreview" class="relative inline-block">
+                                <img :src="`/storage/${selectedTodo.foto_tugas}`" alt="Current Image" 
+                                     class="w-32 h-24 object-cover rounded-lg border-2 border-gray-300">
+                            </div>
+                        </div>
+                        
+                        <!-- New Image Preview -->
+                        <div x-show="editImagePreview" class="mt-3">
+                            <p class="text-sm text-gray-600 mb-2">Preview foto baru:</p>
+                            <div class="relative inline-block">
+                                <img :src="editImagePreview" alt="New Preview" 
+                                     class="w-32 h-24 object-cover rounded-lg border-2 border-indigo-300">
+                                <button type="button" @click="removeEditImagePreview()" 
+                                        class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Judul Tugas *</label>
+                        <input type="text" name="judul_tugas" :value="selectedTodo.judul_tugas" required
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Deskripsi Tugas *</label>
+                        <textarea name="deskripsi_tugas" rows="4" required
+                                  class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  x-text="selectedTodo.deskripsi_tugas"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Selesai *</label>
+                        <input type="date" name="tanggal_selesai" :value="selectedTodo.tanggal_selesai" required
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Status *</label>
+                        <select name="status" required
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="belum_dikerjakan" :selected="selectedTodo.status === 'belum_dikerjakan'">Belum Dikerjakan</option>
+                            <option value="proses" :selected="selectedTodo.status === 'proses'">Dalam Proses</option>
+                            <option value="selesai" :selected="selectedTodo.status === 'selesai'">Selesai</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
+                        <div class="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                            @foreach($categories as $category)
+                                <label class="flex items-center">
+                                    <input type="checkbox" name="categories[]" value="{{ $category->id }}"
+                                           :checked="selectedTodo.categories && selectedTodo.categories.some(cat => cat.id === {{ $category->id }})"
+                                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="ml-2 text-sm text-gray-700">{{ $category->name }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4 border-t">
+                        <button type="button" @click="closeEditModal()"
+                                class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors duration-200">
+                            Batal
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200">
+                            Update
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Todo Modal -->
+    <div x-show="showViewModal" x-transition.opacity class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-gray-900">Detail Tugas</h3>
+                    <button @click="closeViewModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <!-- Image with Zoom Feature -->
+                    <div x-show="selectedTodo.foto_tugas">
+                        <div class="relative group">
+                            <img :src="`/storage/${selectedTodo.foto_tugas}`" :alt="selectedTodo.judul_tugas" 
+                                 class="w-full h-64 object-cover rounded-lg cursor-pointer transition-transform duration-200 hover:scale-105"
+                                 @click="openImageModal()">
+                        </div>
+                    </div>
+                    
+                    <!-- Status Badge -->
+                    <div>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+                              :class="{
+                                'bg-red-100 text-red-800': selectedTodo.status === 'belum_dikerjakan',
+                                'bg-yellow-100 text-yellow-800': selectedTodo.status === 'proses',
+                                'bg-green-100 text-green-800': selectedTodo.status === 'selesai'
+                              }"
+                              x-text="getStatusText(selectedTodo.status)">
+                        </span>
+                    </div>
+
+                    <!-- Title -->
+                    <div>
+                        <h4 class="text-xl font-semibold text-gray-900" x-text="selectedTodo.judul_tugas"></h4>
+                    </div>
+
+                    <!-- Description -->
+                    <div>
+                        <h5 class="text-sm font-medium text-gray-700 mb-2">Deskripsi:</h5>
+                        <p class="text-gray-600 leading-relaxed" x-text="selectedTodo.deskripsi_tugas"></p>
+                    </div>
+
+                    <!-- Categories -->
+                    <div x-show="selectedTodo.categories && selectedTodo.categories.length > 0">
+                        <h5 class="text-sm font-medium text-gray-700 mb-2">Kategori:</h5>
+                        <div class="flex flex-wrap gap-2">
+                            <template x-for="category in selectedTodo.categories" :key="category.id">
+                                <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800"
+                                      x-text="category.name"></span>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Dates -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <h5 class="text-sm font-medium text-gray-700 mb-1">Tanggal Dibuat:</h5>
+                            <p class="text-gray-600" x-text="formatDate(selectedTodo.created_at)"></p>
+                        </div>
+                        <div>
+                            <h5 class="text-sm font-medium text-gray-700 mb-1">Deadline:</h5>
+                            <p class="text-gray-600" x-text="formatDate(selectedTodo.tanggal_selesai)"></p>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    {{-- <div class="flex justify-end space-x-3 pt-4 border-t">
+                        <button @click="closeViewModal(); editTodo(selectedTodo.id)"
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200">
+                            <i class="fas fa-edit mr-2"></i>Edit
+                        </button>
+                        <button @click="deleteTodo(selectedTodo.id)"
+                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200">
+                            <i class="fas fa-trash mr-2"></i>Hapus
+                        </button>
+                    </div> --}}
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Task Detail Modal (hidden by default) -->
-    <div class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full" id="taskModal">
-        <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <div class="mt-3">
-                <div class="flex justify-between items-center pb-3">
-                    <h3 class="text-xl font-semibold text-gray-700">Task Details</h3>
-                    <button class="text-gray-400 hover:text-gray-500">
-                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                        </svg>
-                    </button>
-                </div>
-                <!-- Task details would go here -->
-            </div>
+    <!-- Image Zoom Modal -->
+    <div x-show="showImageModal" x-transition.opacity class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-60" style="display: none;">
+        <div class="relative max-w-4xl max-h-[90vh] p-4">
+            <button @click="closeImageModal()" 
+                    class="absolute top-2 right-2 text-white bg-black bg-opacity-50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-opacity-70 z-10">
+                <i class="fas fa-times text-lg"></i>
+            </button>
+            <img :src="`/storage/${selectedTodo.foto_tugas}`" :alt="selectedTodo.judul_tugas" 
+                 class="max-w-full max-h-full object-contain rounded-lg"
+                 @click="closeImageModal()">
         </div>
     </div>
 
     <script>
-        // JavaScript for interactivity can be added here
-        // For example, to show/hide the task detail modal
+        function todoApp() {
+            return {
+                showAddModal: false,
+                showEditModal: false,
+                showViewModal: false,
+                showImageModal: false,
+                selectedTodo: {},
+                todos: @json($todos->items()),
+                addImagePreview: null,
+                editImagePreview: null,
+
+                openAddModal() {
+                    this.showAddModal = true;
+                    this.addImagePreview = null;
+                    document.body.style.overflow = 'hidden';
+                },
+
+                closeAddModal() {
+                    this.showAddModal = false;
+                    this.addImagePreview = null;
+                    document.body.style.overflow = 'auto';
+                    // Reset form
+                    const form = document.querySelector('form[action="{{ route('todo.add') }}"]');
+                    if (form) form.reset();
+                },
+
+                editTodo(todoId) {
+                    const todo = this.todos.find(t => t.id === todoId);
+                    if (todo) {
+                        this.selectedTodo = { ...todo };
+                        this.showEditModal = true;
+                        this.showViewModal = false;
+                        this.editImagePreview = null;
+                        document.body.style.overflow = 'hidden';
+                    }
+                },
+
+                closeEditModal() {
+                    this.showEditModal = false;
+                    this.selectedTodo = {};
+                    this.editImagePreview = null;
+                    document.body.style.overflow = 'auto';
+                },
+
+                viewTodo(todoId) {
+                    const todo = this.todos.find(t => t.id === todoId);
+                    if (todo) {
+                        this.selectedTodo = { ...todo };
+                        this.showViewModal = true;
+                        document.body.style.overflow = 'hidden';
+                    }
+                },
+
+                closeViewModal() {
+                    this.showViewModal = false;
+                    this.selectedTodo = {};
+                    document.body.style.overflow = 'auto';
+                },
+
+                openImageModal() {
+                    this.showImageModal = true;
+                },
+
+                closeImageModal() {
+                    this.showImageModal = false;
+                },
+
+                previewAddImage(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.addImagePreview = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                removeAddImagePreview() {
+                    this.addImagePreview = null;
+                    const fileInput = document.querySelector('input[name="foto_tugas"]');
+                    if (fileInput) fileInput.value = '';
+                },
+
+                previewEditImage(event) {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            this.editImagePreview = e.target.result;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                },
+
+                removeEditImagePreview() {
+                    this.editImagePreview = null;
+                    const fileInput = document.querySelector('input[name="foto_tugas"][accept="image/*"]');
+                    if (fileInput) fileInput.value = '';
+                },
+
+                deleteTodo(todoId) {
+                    if (confirm('Apakah Anda yakin ingin menghapus tugas ini?')) {
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = `/todo/${todoId}/delete`;
+                        form.innerHTML = `
+                            @csrf
+                            @method('DELETE')
+                        `;
+                        document.body.appendChild(form);
+                        form.submit();
+                    }
+                },
+
+                getStatusText(status) {
+                    const statusMap = {
+                        'belum_dikerjakan': 'Belum Dikerjakan',
+                        'proses': 'Dalam Proses',
+                        'selesai': 'Selesai'
+                    };
+                    return statusMap[status] || status;
+                },
+
+                formatDate(dateString) {
+                    const options = { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    };
+                    return new Date(dateString).toLocaleDateString('id-ID', options);
+                }
+            }
+        }
+
+        // Close modals when pressing Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const alpineData = Alpine.$data(document.body);
+                if (alpineData.showImageModal) {
+                    alpineData.closeImageModal();
+                } else if (alpineData.showViewModal) {
+                    alpineData.closeViewModal();
+                } else if (alpineData.showEditModal) {
+                    alpineData.closeEditModal();
+                } else if (alpineData.showAddModal) {
+                    alpineData.closeAddModal();
+                }
+            }
+        });
     </script>
 </body>
-
 </html>

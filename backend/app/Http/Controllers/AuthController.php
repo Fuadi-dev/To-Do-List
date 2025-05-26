@@ -67,4 +67,9 @@ class AuthController extends Controller
             return redirect()->back()->with("error", "Email sudah terdaftar");
         }
     }
+
+    public function logout(){
+        Auth::logout();
+        return redirect()->route('login')->with('success', 'Berhasil Logout');
+    }
 }
