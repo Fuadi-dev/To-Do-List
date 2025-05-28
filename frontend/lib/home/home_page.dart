@@ -18,18 +18,20 @@ class _HomePageState extends State<HomePage> {
   List<dynamic> _categories = [];
   bool _isLoading = true;
   String _searchQuery = '';
-  String? _statusFilter;
-  
-  // Stats
-  int _totalTodos = 0;
-  int _pendingTodos = 0;
-  int _inProgressTodos = 0;
-  int _completedTodos = 0;
+
+  // Filter todos berdasarkan status seperti di website
+  List<dynamic> get _activeTodos =>
+      _todos.where((todo) => todo['status'] != 'selesai').toList();
+  List<dynamic> get _completedTodos =>
+      _todos.where((todo) => todo['status'] == 'selesai').toList();
+  List<dynamic> get _overdueTodos =>
+      _todos.where((todo) => todo['status'] == 'terlambat').toList();
+  List<dynamic> get _inProgressTodos =>
+      _todos.where((todo) => todo['status'] == 'belum_dikerjakan').toList();
 
   final TextEditingController _judulController = TextEditingController();
   final TextEditingController _deskripsiController = TextEditingController();
   final TextEditingController _tanggalController = TextEditingController();
-  String _selectedStatus = 'belum_dikerjakan';
   List<int> _selectedCategories = [];
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
 
@@ -53,18 +55,9 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      await Future.wait([
-        _fetchTodos(),
-        _fetchCategories(),
-      ]);
-      _calculateStats();
+      await Future.wait([_fetchTodos(), _fetchCategories()]);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Terjadi kesalahan: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showErrorSnackBar('Terjadi kesalahan: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -83,7 +76,7 @@ class _HomePageState extends State<HomePage> {
       }
 
       final response = await http.get(
-        Uri.parse('$base_url/get-category'), // Menggunakan endpoint yang benar
+        Uri.parse('$base_url/categories'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -92,18 +85,16 @@ class _HomePageState extends State<HomePage> {
 
       final responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && responseData['status'] == true) {
         setState(() {
           _categories = responseData['data'];
         });
       } else {
-        // Jika gagal mendapatkan kategori, set sebagai list kosong
         setState(() {
           _categories = [];
         });
       }
     } catch (e) {
-      print('Error fetching categories: $e');
       setState(() {
         _categories = [];
       });
@@ -120,7 +111,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     final response = await http.get(
-      Uri.parse('$base_url/todos'),
+      Uri.parse('$base_url/'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $token',
@@ -129,52 +120,34 @@ class _HomePageState extends State<HomePage> {
 
     final responseData = jsonDecode(response.body);
 
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200 && responseData['status'] == true) {
+      final todosData = responseData['data']['todos']['data'] ?? [];
       setState(() {
-        _todos = responseData['data'] ?? [];
+        _todos = todosData;
       });
     } else {
-      // Set todos ke array kosong jika errornya karena "tidak ada data"
       setState(() {
         _todos = [];
       });
-      
-      // Hanya tampilkan pesan error jika bukan karena "tidak ada data"
-      final errorMessage = responseData['message'] ?? 'Gagal mengambil data';
-      if (errorMessage != 'Gagal mendapatkan data') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
-  }
-
-  void _calculateStats() {
-    _totalTodos = _todos.length;
-    _pendingTodos = _todos.where((todo) => todo['status'] == 'belum_dikerjakan').length;
-    _inProgressTodos = _todos.where((todo) => todo['status'] == 'proses').length;
-    _completedTodos = _todos.where((todo) => todo['status'] == 'selesai').length;
   }
 
   List<dynamic> get _filteredTodos {
     return _todos.where((todo) {
-      // Filter by search query
-      final matchesQuery = todo['judul_tugas'].toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          todo['deskripsi_tugas'].toLowerCase().contains(_searchQuery.toLowerCase());
-      
-      // Filter by status
-      final matchesStatus = _statusFilter == null || todo['status'] == _statusFilter;
-      
-      return matchesQuery && matchesStatus;
+      final matchesQuery =
+          todo['judul_tugas'].toLowerCase().contains(
+            _searchQuery.toLowerCase(),
+          ) ||
+          todo['deskripsi_tugas'].toLowerCase().contains(
+            _searchQuery.toLowerCase(),
+          );
+      return matchesQuery;
     }).toList();
   }
 
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     try {
       final token = prefs.getString('token');
       if (token != null) {
@@ -187,11 +160,12 @@ class _HomePageState extends State<HomePage> {
         );
       }
     } catch (e) {
-      // Jika endpoint logout gagal, tetap lanjut hapus token lokal
+      // Continue with local logout even if API fails
     }
-    
+
     await prefs.remove('token');
-    
+    await prefs.remove('user_data');
+
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -199,26 +173,20 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<void> _showAddEditTodoDialog({Map<dynamic, dynamic>? todo, bool fromDetail = false}) async {
-    // Jika fungsi ini dipanggil dari halaman detail, tutup modal detail terlebih dahulu
-    if (fromDetail) {
-      Navigator.of(context).pop(); // Tutup modal detail
-    }
-    
-    // Reset form atau isi dengan data todo jika mengedit
+  Future<void> _showAddEditTodoDialog({Map<dynamic, dynamic>? todo}) async {
     if (todo != null) {
       _judulController.text = todo['judul_tugas'];
       _deskripsiController.text = todo['deskripsi_tugas'];
-      _selectedStatus = todo['status'];
       _selectedDate = DateTime.parse(todo['tanggal_selesai']);
       _tanggalController.text = DateFormat('yyyy-MM-dd').format(_selectedDate);
-      _selectedCategories = (todo['categories'] as List?)
+      _selectedCategories =
+          (todo['categories'] as List?)
               ?.map((cat) => cat['id'] as int)
-              .toList() ?? [];
+              .toList() ??
+          [];
     } else {
       _judulController.clear();
       _deskripsiController.clear();
-      _selectedStatus = 'belum_dikerjakan';
       _selectedDate = DateTime.now().add(const Duration(days: 1));
       _tanggalController.text = DateFormat('yyyy-MM-dd').format(_selectedDate);
       _selectedCategories = [];
@@ -226,176 +194,203 @@ class _HomePageState extends State<HomePage> {
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(todo == null ? 'Tambah Tugas' : 'Edit Tugas'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: _judulController,
-                  decoration: const InputDecoration(
-                    labelText: 'Judul Tugas',
-                    border: OutlineInputBorder(),
+      builder:
+          (context) => StatefulBuilder(
+            builder:
+                (context, setDialogState) => AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _deskripsiController,
-                  decoration: const InputDecoration(
-                    labelText: 'Deskripsi',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _tanggalController,
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Tanggal Selesai',
-                    border: OutlineInputBorder(),
-                    suffixIcon: Icon(Icons.calendar_today),
-                  ),
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (picked != null) {
-                      setDialogState(() {
-                        _selectedDate = picked;
-                        _tanggalController.text = DateFormat('yyyy-MM-dd').format(picked);
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _selectedStatus,
-                  decoration: const InputDecoration(
-                    labelText: 'Status',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'belum_dikerjakan',
-                      child: Text('Belum Dikerjakan'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'proses',
-                      child: Text('Proses'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'selesai',
-                      child: Text('Selesai'),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setDialogState(() {
-                        _selectedStatus = value;
-                      });
-                    }
-                  },
-                ),
-                if (_categories.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Kategori',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  title: Text(
+                    todo == null ? 'Tambah Tugas' : 'Edit Tugas',
+                    style: TextStyle(
+                      color: Colors.deepPurple.shade700,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.all(12),
+                  content: SingleChildScrollView(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (_selectedCategories.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              'Belum ada kategori yang dipilih',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontStyle: FontStyle.italic,
+                        TextField(
+                          controller: _judulController,
+                          decoration: InputDecoration(
+                            labelText: 'Judul Tugas',
+                            labelStyle: TextStyle(
+                              color: Colors.deepPurple.shade700,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.deepPurple.shade700,
+                                width: 2,
                               ),
                             ),
                           ),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final category in _categories)
-                              FilterChip(
-                                label: Text(category['name']),
-                                selected: _selectedCategories.contains(category['id']),
-                                selectedColor: Colors.deepPurple.shade100,
-                                checkmarkColor: Colors.deepPurple,
-                                onSelected: (selected) {
-                                  setDialogState(() {
-                                    if (selected) {
-                                      _selectedCategories.add(category['id']);
-                                    } else {
-                                      _selectedCategories.remove(category['id']);
-                                    }
-                                  });
-                                },
-                              ),
-                          ],
                         ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _deskripsiController,
+                          decoration: InputDecoration(
+                            labelText: 'Deskripsi',
+                            labelStyle: TextStyle(
+                              color: Colors.deepPurple.shade700,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.deepPurple.shade700,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _tanggalController,
+                          readOnly: true,
+                          decoration: InputDecoration(
+                            labelText: 'Tanggal Selesai',
+                            labelStyle: TextStyle(
+                              color: Colors.deepPurple.shade700,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.deepPurple.shade700,
+                                width: 2,
+                              ),
+                            ),
+                            suffixIcon: Icon(
+                              Icons.calendar_today,
+                              color: Colors.deepPurple.shade700,
+                            ),
+                          ),
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: _selectedDate,
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: ColorScheme.light(
+                                      primary: Colors.deepPurple.shade700,
+                                      onPrimary: Colors.white,
+                                      surface: Colors.white,
+                                      onSurface: Colors.black,
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (picked != null) {
+                              setDialogState(() {
+                                _selectedDate = picked;
+                                _tanggalController.text = DateFormat(
+                                  'yyyy-MM-dd',
+                                ).format(picked);
+                              });
+                            }
+                          },
+                        ),
+                        if (_categories.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Kategori',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.deepPurple.shade700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.all(12),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final category in _categories)
+                                  FilterChip(
+                                    label: Text(category['name']),
+                                    selected: _selectedCategories.contains(
+                                      category['id'],
+                                    ),
+                                    selectedColor: Colors.deepPurple.shade100,
+                                    checkmarkColor: Colors.deepPurple.shade700,
+                                    onSelected: (selected) {
+                                      setDialogState(() {
+                                        if (selected) {
+                                          _selectedCategories.add(
+                                            category['id'],
+                                          );
+                                        } else {
+                                          _selectedCategories.remove(
+                                            category['id'],
+                                          );
+                                        }
+                                      });
+                                    },
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      'Pilih kategori sesuai kebutuhan (bisa lebih dari satu)',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                        fontStyle: FontStyle.italic,
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(
+                        'BATAL',
+                        style: TextStyle(color: Colors.grey.shade600),
                       ),
                     ),
-                  ),
-                ],
-              ],
-            ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        if (todo == null) {
+                          _createTodo();
+                        } else {
+                          _updateTodo(todo['id']);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(todo == null ? 'TAMBAH' : 'SIMPAN'),
+                    ),
+                  ],
+                ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('BATAL'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                if (todo == null) {
-                  _createTodo();
-                } else {
-                  _updateTodo(todo['id'], originalTodo: todo);
-                }
-              },
-              child: Text(todo == null ? 'TAMBAH' : 'SIMPAN'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -414,7 +409,7 @@ class _HomePageState extends State<HomePage> {
       }
 
       final response = await http.post(
-        Uri.parse('$base_url/postTodo'),
+        Uri.parse('$base_url/todo/add'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -423,36 +418,22 @@ class _HomePageState extends State<HomePage> {
           'judul_tugas': _judulController.text,
           'deskripsi_tugas': _deskripsiController.text,
           'tanggal_selesai': _tanggalController.text,
-          'status': _selectedStatus,
           'categories': _selectedCategories,
         }),
       );
 
       final responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Berhasil menambahkan tugas'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        _showSuccessSnackBar('Berhasil menambahkan tugas');
         _fetchData();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(responseData['message'] ?? 'Gagal menambahkan tugas'),
-            backgroundColor: Colors.red,
-          ),
+        _showErrorSnackBar(
+          responseData['message'] ?? 'Gagal menambahkan tugas',
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Terjadi kesalahan: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showErrorSnackBar('Terjadi kesalahan: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -460,7 +441,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _updateTodo(int id, {Map<dynamic, dynamic>? originalTodo}) async {
+  Future<void> _updateTodo(int id) async {
     setState(() {
       _isLoading = true;
     });
@@ -475,7 +456,7 @@ class _HomePageState extends State<HomePage> {
       }
 
       final response = await http.put(
-        Uri.parse('$base_url/todos-update/$id'),
+        Uri.parse('$base_url/todo/$id/edit'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -484,53 +465,20 @@ class _HomePageState extends State<HomePage> {
           'judul_tugas': _judulController.text,
           'deskripsi_tugas': _deskripsiController.text,
           'tanggal_selesai': _tanggalController.text,
-          'status': _selectedStatus,
           'categories': _selectedCategories,
         }),
       );
 
       final responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Berhasil mengupdate tugas'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // Refresh semua data
-        await _fetchData();
-        
-        // Jika ini dipanggil dari detail (originalTodo != null)
-        // tampilkan detail yang diperbarui
-        if (originalTodo != null) {
-          // Cari todo yang baru diperbarui
-          final updatedTodo = _todos.firstWhere(
-            (t) => t['id'] == id,
-            orElse: () => null,
-          );
-          
-          if (updatedTodo != null) {
-            // Tampilkan detail yang sudah diperbarui tanpa duplikasi
-            _showTodoDetails(updatedTodo);
-          }
-        }
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        _showSuccessSnackBar('Berhasil mengupdate tugas');
+        _fetchData();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(responseData['message'] ?? 'Gagal mengupdate tugas'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorSnackBar(responseData['message'] ?? 'Gagal mengupdate tugas');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Terjadi kesalahan: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showErrorSnackBar('Terjadi kesalahan: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -539,25 +487,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _deleteTodo(int id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Konfirmasi'),
-        content: const Text('Apakah Anda yakin ingin menghapus tugas ini?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('BATAL'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            child: const Text('HAPUS'),
-          ),
-        ],
-      ),
+    final confirmed = await _showConfirmDialog(
+      'Konfirmasi',
+      'Apakah Anda yakin ingin menghapus tugas ini?',
     );
 
     if (confirmed != true) return;
@@ -576,7 +508,7 @@ class _HomePageState extends State<HomePage> {
       }
 
       final response = await http.delete(
-        Uri.parse('$base_url/todos-delete/$id'),
+        Uri.parse('$base_url/todo/$id/delete'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -585,29 +517,14 @@ class _HomePageState extends State<HomePage> {
 
       final responseData = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Berhasil menghapus tugas'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        _showSuccessSnackBar('Berhasil menghapus tugas');
         _fetchData();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(responseData['message'] ?? 'Gagal menghapus tugas'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorSnackBar(responseData['message'] ?? 'Gagal menghapus tugas');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Terjadi kesalahan: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showErrorSnackBar('Terjadi kesalahan: $e');
     } finally {
       setState(() {
         _isLoading = false;
@@ -615,259 +532,292 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            SliverAppBar(
-              expandedHeight: 160.0, // Kurangi dari 180.0
-              floating: false,
-              pinned: true,
-              flexibleSpace: FlexibleSpaceBar(
-                centerTitle: false,
-                background: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.deepPurple.shade700,
-                        Colors.deepPurple.shade300,
-                      ],
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 70, 8, 8), // Kurangi padding
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Your Tasks',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24, // Kurangi ukuran font
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 10), // Kurangi space
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _buildStatCard(
-                                title: 'Total',
-                                count: _totalTodos,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 4),
-                              _buildStatCard(
-                                title: 'Pending',
-                                count: _pendingTodos,
-                                color: Colors.red.shade200,
-                              ),
-                              const SizedBox(width: 4),
-                              _buildStatCard(
-                                title: 'In Progress',
-                                count: _inProgressTodos,
-                                color: Colors.amber.shade200,
-                              ),
-                              const SizedBox(width: 4),
-                              _buildStatCard(
-                                title: 'Completed',
-                                count: _completedTodos,
-                                color: Colors.green.shade200,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.logout, color: Colors.white),
-                  onPressed: _logout,
-                  tooltip: 'Logout',
-                ),
-              ],
-            ),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _SearchBarDelegate(
-                child: Container(
-                  color: Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                decoration: const InputDecoration(
-                                  hintText: 'Cari tugas...',
-                                  border: InputBorder.none,
-                                ),
-                                onChanged: (value) {
-                                  setState(() {
-                                    _searchQuery = value;
-                                  });
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: _FilterBarDelegate(
-                child: Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        FilterChip(
-                          label: const Text('Semua'),
-                          selected: _statusFilter == null,
-                          onSelected: (selected) {
-                            setState(() {
-                              _statusFilter = selected ? null : _statusFilter;
-                            });
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        FilterChip(
-                          label: const Text('Belum Dikerjakan'),
-                          selected: _statusFilter == 'belum_dikerjakan',
-                          onSelected: (selected) {
-                            setState(() {
-                              _statusFilter = selected ? 'belum_dikerjakan' : null;
-                            });
-                          },
-                          backgroundColor: Colors.white,
-                          selectedColor: Colors.red.shade100,
-                        ),
-                        const SizedBox(width: 8),
-                        FilterChip(
-                          label: const Text('Proses'),
-                          selected: _statusFilter == 'proses',
-                          onSelected: (selected) {
-                            setState(() {
-                              _statusFilter = selected ? 'proses' : null;
-                            });
-                          },
-                          backgroundColor: Colors.white,
-                          selectedColor: Colors.amber.shade100,
-                        ),
-                        const SizedBox(width: 8),
-                        FilterChip(
-                          label: const Text('Selesai'),
-                          selected: _statusFilter == 'selesai',
-                          onSelected: (selected) {
-                            setState(() {
-                              _statusFilter = selected ? 'selesai' : null;
-                            });
-                          },
-                          backgroundColor: Colors.white,
-                          selectedColor: Colors.green.shade100,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ];
+  Future<void> _toggleTodoStatus(int id) async {
+    final confirmed = await _showConfirmDialog(
+      'Konfirmasi Penyelesaian Tugas',
+      'Apakah Anda yakin ingin menandai tugas ini sebagai selesai?',
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null) {
+        _logout();
+        return;
+      }
+
+      final response = await http.patch(
+        Uri.parse('$base_url/todo/$id/toggle-status'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
         },
-        body: _isLoading 
-          ? const Center(child: CircularProgressIndicator())
-          : _filteredTodos.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.task_alt,
-                        size: 80,
-                        color: Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _todos.isEmpty 
-                          ? 'Belum ada tugas'
-                          : 'Tidak ada tugas yang sesuai filter',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _filteredTodos.length,
-                  itemBuilder: (context, index) {
-                    final todo = _filteredTodos[index];
-                    return _buildTodoCard(todo);
-                  },
-                ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddEditTodoDialog(),
-        icon: const Icon(Icons.add),
-        label: const Text('Tambah Tugas'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
+      );
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && responseData['status'] == true) {
+        _showSuccessSnackBar('Tugas berhasil diselesaikan!');
+        _fetchData();
+      } else {
+        _showErrorSnackBar(
+          responseData['message'] ?? 'Gagal mengubah status tugas',
+        );
+      }
+    } catch (e) {
+      _showErrorSnackBar('Terjadi kesalahan: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
-  Widget _buildStatCard({required String title, required int count, required Color color}) {
-    return Card(
-      elevation: 1, // Kurangi elevasi
-      color: color,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(6), // Kurangi radius
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
       ),
-      child: Container(
-        width: 80, // Tetapkan lebar tetap
-        padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 4.0), // Kurangi padding
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
+    );
+  }
+
+  Future<bool?> _showConfirmDialog(String title, String content) {
+    return showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
               title,
               style: TextStyle(
-                fontSize: 9, // Kurangi font
-                color: title == 'Total' ? Colors.deepPurple : Colors.black87,
-                fontWeight: FontWeight.w500,
+                color: Colors.deepPurple.shade700,
+                fontWeight: FontWeight.bold,
               ),
             ),
+            content: Text(content),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text(
+                  'BATAL',
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple.shade700,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('YA'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text(
+            'TaskMaster',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.deepPurple.shade700,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: _logout,
+              tooltip: 'Logout',
+            ),
+          ],
+          bottom: const TabBar(
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            indicatorColor: Colors.white,
+            tabs: [
+              Tab(icon: Icon(Icons.pending_actions), text: 'Aktif'),
+              Tab(icon: Icon(Icons.warning), text: 'Terlambat'),
+              Tab(icon: Icon(Icons.check_circle), text: 'Selesai'),
+            ],
+          ),
+        ),
+        body: Column(
+          children: [
+            // Search Bar
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.deepPurple.shade700,
+                    Colors.deepPurple.shade50,
+                  ],
+                ),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'Cari tugas...',
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Colors.deepPurple.shade700,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: Colors.deepPurple.shade700,
+                      width: 2,
+                    ),
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+              ),
+            ),
+            // Statistics Cards
+            Container(
+              color: Colors.deepPurple.shade50,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      'Total',
+                      _todos.length,
+                      Colors.deepPurple.shade700,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildStatCard(
+                      'Aktif',
+                      _inProgressTodos.length,
+                      Colors.orange,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildStatCard(
+                      'Telat',
+                      _overdueTodos.length,
+                      Colors.red,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _buildStatCard(
+                      'Selesai',
+                      _completedTodos.length,
+                      Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Tab Views
+            Expanded(
+              child:
+                  _isLoading
+                      ? Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.deepPurple.shade700,
+                        ),
+                      )
+                      : TabBarView(
+                        children: [
+                          _buildTodoList(
+                            _inProgressTodos,
+                            'Belum ada tugas aktif',
+                          ),
+                          _buildTodoList(
+                            _overdueTodos,
+                            'Tidak ada tugas yang terlambat',
+                          ),
+                          _buildTodoList(
+                            _completedTodos,
+                            'Belum ada tugas yang selesai',
+                          ),
+                        ],
+                      ),
+            ),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () => _showAddEditTodoDialog(),
+          icon: const Icon(Icons.add),
+          label: const Text('Tambah Tugas'),
+          backgroundColor: Colors.deepPurple.shade700,
+          foregroundColor: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String title, int count, Color color) {
+    return Card(
+      elevation: 2,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: color.withOpacity(0.1),
+        ),
+        child: Column(
+          children: [
             Text(
               '$count',
               style: TextStyle(
-                fontSize: 14, // Kurangi font
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: title == 'Total' ? Colors.deepPurple : Colors.black87,
+                color: color,
+              ),
+            ),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                color: color,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -876,362 +826,229 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildTodoList(List<dynamic> todos, String emptyMessage) {
+    final filteredTodos =
+        todos.where((todo) {
+          return todo['judul_tugas'].toLowerCase().contains(
+                _searchQuery.toLowerCase(),
+              ) ||
+              todo['deskripsi_tugas'].toLowerCase().contains(
+                _searchQuery.toLowerCase(),
+              );
+        }).toList();
+
+    if (filteredTodos.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.task_alt, size: 80, color: Colors.grey.shade400),
+            const SizedBox(height: 16),
+            Text(
+              emptyMessage,
+              style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: filteredTodos.length,
+      itemBuilder: (context, index) {
+        final todo = filteredTodos[index];
+        return _buildTodoCard(todo);
+      },
+    );
+  }
+
   Widget _buildTodoCard(Map<dynamic, dynamic> todo) {
     final DateTime tanggalSelesai = DateTime.parse(todo['tanggal_selesai']);
-    final bool isOverdue = tanggalSelesai.isBefore(DateTime.now()) && 
-                          todo['status'] != 'selesai';
-    
+    final String status = todo['status'];
+
+    Color borderColor = Colors.transparent;
+    Color statusColor = Colors.grey;
+    String statusText = '';
+
+    switch (status) {
+      case 'belum_dikerjakan':
+        borderColor = Colors.orange;
+        statusColor = Colors.orange;
+        statusText = 'Belum Dikerjakan';
+        break;
+      case 'terlambat':
+        borderColor = Colors.red;
+        statusColor = Colors.red;
+        statusText = 'Terlambat';
+        break;
+      case 'selesai':
+        borderColor = Colors.green;
+        statusColor = Colors.green;
+        statusText = 'Selesai';
+        break;
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 3,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: isOverdue 
-            ? Colors.red.withOpacity(0.5) 
-            : Colors.transparent,
-          width: 1.5,
-        ),
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: borderColor.withOpacity(0.5), width: 1),
       ),
-      child: InkWell(
-        onTap: () => _showTodoDetails(todo),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          todo['judul_tugas'],
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          todo['deskripsi_tugas'],
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade700,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  _buildStatusChip(todo['status']),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Divider(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 16,
-                        color: isOverdue ? Colors.red : Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 4),
                       Text(
-                        DateFormat('dd MMM yyyy').format(tanggalSelesai),
+                        todo['judul_tugas'],
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.deepPurple.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        todo['deskripsi_tugas'],
                         style: TextStyle(
                           fontSize: 14,
-                          color: isOverdue ? Colors.red : Colors.grey.shade600,
-                          fontWeight: isOverdue ? FontWeight.bold : FontWeight.normal,
+                          color: Colors.grey.shade700,
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (isOverdue) ...[
-                        const SizedBox(width: 4),
-                        const Text(
-                          'Terlambat!',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
+                ),
+                Chip(
+                  label: Text(
+                    statusText,
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                  backgroundColor: statusColor,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.calendar_today, size: 16, color: statusColor),
+                const SizedBox(width: 4),
+                Text(
+                  DateFormat('dd MMM yyyy').format(tanggalSelesai),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: statusColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (status == 'terlambat') ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    '(${DateTime.now().difference(tanggalSelesai).inDays} hari)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if ((todo['categories'] as List?)?.isNotEmpty == true) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final category in (todo['categories'] as List))
+                    Chip(
+                      label: Text(
+                        category['name'],
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: Colors.deepPurple.shade100,
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (status != 'selesai')
                   Row(
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit, size: 20, color: Colors.deepPurple),
-                        onPressed: () => _showAddEditTodoDialog(todo: todo),
-                        tooltip: 'Edit',
-                        constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(8),
+                      Checkbox(
+                        value: false,
+                        onChanged: (value) {
+                          if (value == true) {
+                            _toggleTodoStatus(todo['id']);
+                          }
+                        },
+                        activeColor: Colors.green,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-                        onPressed: () => _deleteTodo(todo['id']),
-                        tooltip: 'Delete',
-                        constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(8),
+                      const Text(
+                        'Tandai Selesai',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  )
+                else
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: true,
+                        onChanged: null,
+                        activeColor: Colors.green,
+                      ),
+                      const Text(
+                        'Selesai',
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                     ],
                   ),
-                ],
-              ),
-              if ((todo['categories'] as List?)?.isNotEmpty == true) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (final category in (todo['categories'] as List))
-                      Chip(
-                        label: Text(
-                          category['name'],
-                          style: const TextStyle(fontSize: 12),
+                    if (status != 'selesai')
+                      IconButton(
+                        icon: Icon(
+                          Icons.edit,
+                          size: 20,
+                          color: Colors.deepPurple.shade700,
                         ),
-                        padding: EdgeInsets.zero,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                        backgroundColor: Colors.grey.shade200,
+                        onPressed: () => _showAddEditTodoDialog(todo: todo),
+                        tooltip: 'Edit',
                       ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete,
+                        size: 20,
+                        color: Colors.red,
+                      ),
+                      onPressed: () => _deleteTodo(todo['id']),
+                      tooltip: 'Delete',
+                    ),
                   ],
                 ),
               ],
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
-  }
-
-  void _showTodoDetails(Map<dynamic, dynamic> todo) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (_, controller) => SingleChildScrollView(
-          controller: controller,
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      todo['judul_tugas'],
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  _buildStatusChip(todo['status']),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Deskripsi:',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                todo['deskripsi_tugas'],
-                style: const TextStyle(fontSize: 16),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today, size: 20),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Tanggal Selesai:',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat('dd MMMM yyyy').format(DateTime.parse(todo['tanggal_selesai'])),
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(Icons.access_time, size: 20),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Dibuat pada:',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    DateFormat('dd MMM yyyy, HH:mm').format(DateTime.parse(todo['created_at'])),
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ],
-              ),
-              if ((todo['categories'] as List?)?.isNotEmpty == true) ...[
-                const SizedBox(height: 24),
-                const Text(
-                  'Kategori:',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final category in (todo['categories'] as List))
-                      Chip(
-                        label: Text(category['name']),
-                        backgroundColor: Colors.grey.shade200,
-                      ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: () => _showAddEditTodoDialog(
-                      todo: todo,
-                      fromDetail: true, // Tambahkan parameter ini
-                    ),
-                    icon: const Icon(Icons.edit),
-                    label: const Text('Edit'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurple,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      // Tutup bottom sheet terlebih dahulu
-                      Navigator.of(context).pop();
-                      // Kemudian jalankan proses delete
-                      _deleteTodo(todo['id']);
-                    },
-                    icon: const Icon(Icons.delete),
-                    label: const Text('Hapus'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusChip(String status) {
-    Color chipColor;
-    String statusText;
-
-    switch (status) {
-      case 'belum_dikerjakan':
-        chipColor = Colors.red;
-        statusText = 'Belum Dikerjakan';
-        break;
-      case 'proses':
-        chipColor = Colors.amber;
-        statusText = 'Proses';
-        break;
-      case 'selesai':
-        chipColor = Colors.green;
-        statusText = 'Selesai';
-        break;
-      default:
-        chipColor = Colors.grey;
-        statusText = 'Unknown';
-    }
-
-    return Chip(
-      label: Text(
-        statusText,
-        style: const TextStyle(color: Colors.white, fontSize: 12),
-      ),
-      backgroundColor: chipColor,
-      padding: EdgeInsets.zero,
-      labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: -2),
-      visualDensity: VisualDensity.compact,
-    );
-  }
-}
-
-class _SearchBarDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
-
-  _SearchBarDelegate({required this.child});
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return child;
-  }
-
-  @override
-  double get maxExtent => 60;
-
-  @override
-  double get minExtent => 60;
-
-  @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
-    return false;
-  }
-}
-
-class _FilterBarDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
-
-  _FilterBarDelegate({required this.child});
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return child;
-  }
-
-  @override
-  double get maxExtent => 56;
-
-  @override
-  double get minExtent => 56;
-
-  @override
-  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
-    return false;
   }
 }

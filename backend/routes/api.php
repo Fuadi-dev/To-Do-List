@@ -14,11 +14,19 @@ Route::post('/login', [AuthController::class, 'login']);
 
 // Lindungi route dengan middleware auth:sanctum
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('get-category', [TodosController::class, 'categories']);
-    Route::post('/post-category', [TodosController::class, 'postCategory']);
-    Route::post('/postTodo', [TodosController::class, 'postTodo']);
-    Route::get('/todos', [TodosController::class, 'toDos']);
-    Route::put('/todos-update/{id}', [TodosController::class, 'updateTodo']);
-    Route::delete('/todos-delete/{id}', [TodosController::class, 'deleteTodo']);
+    // Home/Index route
+    Route::get('/', [TodosController::class, 'index'])->name('api.home');
+    
+    // Category routes
+    Route::get('/categories', [TodosController::class, 'categories']);
+    Route::post('/categories', [TodosController::class, 'postCategory']);
+    
+    // Todo routes (samakan dengan web routes)
+    Route::post('/todo/add', [TodosController::class, 'addTodo'])->name('api.todo.add');
+    Route::put('/todo/{id}/edit', [TodosController::class, 'editTodo'])->name('api.todo.edit');
+    Route::delete('/todo/{id}/delete', [TodosController::class, 'deleteTodo'])->name('api.todo.delete');
+    Route::patch('/todo/{id}/toggle-status', [TodosController::class, 'toggleStatus'])->name('api.todo.toggle-status');
+    
+    // Auth route
     Route::post('/logout', [AuthController::class, 'logout']);
 });

@@ -4,7 +4,7 @@
             <!-- Logo -->
             <div class="flex items-center">
                 <div class="flex-shrink-0">
-                    <h1 class="text-2xl font-bold text-indigo-600">TodoApp</h1>
+                    <h1 class="text-2xl font-bold text-indigo-600">TaskMaster</h1>
                 </div>
             </div>
 

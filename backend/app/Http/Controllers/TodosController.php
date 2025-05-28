@@ -6,6 +6,8 @@ use App\Models\Category;
 use App\Models\ToDo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class TodosController extends Controller
 {
@@ -13,7 +15,7 @@ class TodosController extends Controller
         $perPage = $request->input('per_page', 10);
         $search = $request->input('search', '');
         $sortBy = $request->input('sort_by', 'created_at');
-        $sortDir = $request->input('sort_dir', 'asc');
+        $sortDir = $request->input('sort_dir', 'desc');
 
         $query = ToDo::with('categories');
 
@@ -23,6 +25,9 @@ class TodosController extends Controller
         
         // Hanya tampilkan todo milik user yang sedang login
         $query->where('user_id', Auth::user()->id);
+
+        // Update status otomatis untuk semua todo yang terlambat
+        $this->updateOverdueTodos();
 
         // Filter by category
         if ($request->has('category_id') && !empty($request->category_id)) {
@@ -48,16 +53,26 @@ class TodosController extends Controller
 
         return view('index', compact('todos', 'categories', 'search', 'sortBy', 'sortDir', 'perPage'));
     }
+
+    // Method untuk update status otomatis
+    private function updateOverdueTodos()
+    {
+        ToDo::where('user_id', Auth::id())
+            ->where('status', '!=', 'selesai')
+            ->where('tanggal_selesai', '<', Carbon::now())
+            ->update(['status' => 'terlambat']);
+    }
+
     function addTodo(Request $request){
         if(!Auth::check()){
-            return redirect()->route('login')->with('error', 'Silakan login untuk menambahkan To-Do.');
+            return response()->json(['error' => 'Silakan login untuk menambahkan To-Do.'], 401);
         }
+        
         $request->validate([
             "foto_tugas" => "image|mimes:jpeg,png,jpg,gif|max:2048",
             "judul_tugas" => "required|string|max:255",
             "deskripsi_tugas" => "required|string|max:1000",
-            "tanggal_selesai" => "required|date|after_or_equal:tanggal_tugas",
-            "status" => "required|in:belum_dikerjakan,proses,selesai",
+            "tanggal_selesai" => "required|date|after_or_equal:today",
             "categories.*" => "exists:categories,id",
         ]);
 
@@ -65,7 +80,7 @@ class TodosController extends Controller
             $imageName = time() . '_' . $request->file('foto_tugas')->getClientOriginalName();
             $imagePath = $request->file('foto_tugas')->storeAs('images', $imageName, 'public');
         } else {
-            $imagePath = null; // Atau berikan nilai default jika tidak ada gambar
+            $imagePath = null;
         }
 
         $todo = new ToDo();
@@ -73,41 +88,49 @@ class TodosController extends Controller
         $todo->user_id = Auth::id();
         $todo->judul_tugas = $request->judul_tugas;
         $todo->deskripsi_tugas = $request->deskripsi_tugas;
-        $todo->tanggal_tugas = now();
         $todo->tanggal_selesai = $request->tanggal_selesai;
-        $todo->status = $request->status;
+        $todo->status = 'belum_dikerjakan';
         $todo->save();
 
         if($request->has('categories')){
             $todo->categories()->sync($request->categories);
-        }else{
-            $todo->categories()->detach();
         }
+
         if($todo){
-            return redirect()->back()->with('success', 'To-Do berhasil ditambahkan!');
+            return response()->json([
+                'success' => true,
+                'message' => 'Tugas berhasil ditambahkan!'
+            ]);
         } else {
-            return redirect()->back()->with('error', 'Gagal menambahkan To-Do.');
+            return response()->json(['error' => 'Gagal menambahkan tugas.'], 500);
         }
     }
 
     function editTodo(Request $request, $id){
-        $todo = ToDo::findOrFail($id);
+        $todo = ToDo::find($id);
         if(!$todo){
-            return redirect()->route('home')->with('error', 'To-Do tidak ditemukan.');
+            return response()->json(['error' => 'To-Do tidak ditemukan.'], 404);
         }else if($todo->user_id != Auth::id()){
-            return redirect()->route('home')->with('error', 'Anda tidak memiliki akses untuk mengedit To-Do ini.');
+            return response()->json(['error' => 'Anda tidak memiliki akses untuk mengedit To-Do ini.'], 403);
+        }
+
+        // Cek apakah todo sudah selesai
+        if($todo->status === 'selesai') {
+            return response()->json(['error' => 'Tugas yang sudah selesai tidak dapat diedit.'], 400);
         }
 
         $request->validate([
             "foto_tugas" => "nullable|image|mimes:jpeg,png,jpg,gif|max:2048",
             "judul_tugas" => "required|string|max:255",
             "deskripsi_tugas" => "required|string|max:1000",
-            "tanggal_selesai" => "required|date|after_or_equal:tanggal_tugas",
-            "status" => "required|in:belum_dikerjakan,proses,selesai", // Diperbaiki typo
+            "tanggal_selesai" => "required|date",
             "categories.*" => "exists:categories,id",
         ]);
 
         if($request->hasFile('foto_tugas')){
+            if($todo->foto_tugas && Storage::disk('public')->exists($todo->foto_tugas)) {
+                Storage::disk('public')->delete($todo->foto_tugas);
+            }
             $imageName = time() . '_' . $request->file('foto_tugas')->getClientOriginalName();
             $imagePath = $request->file('foto_tugas')->storeAs('images', $imageName, 'public');
             $todo->foto_tugas = $imagePath;
@@ -116,7 +139,12 @@ class TodosController extends Controller
         $todo->judul_tugas = $request->judul_tugas;
         $todo->deskripsi_tugas = $request->deskripsi_tugas;
         $todo->tanggal_selesai = $request->tanggal_selesai;
-        $todo->status = $request->status;
+        
+        // Update status jika deadline berubah
+        if(Carbon::parse($request->tanggal_selesai)->isFuture() && $todo->status === 'terlambat') {
+            $todo->status = 'belum_dikerjakan';
+        }
+        
         $todo->save();
         
         if($request->has('categories')){
@@ -124,28 +152,60 @@ class TodosController extends Controller
         }else{
             $todo->categories()->detach();
         }
-        if($todo){
-            return redirect()->back()->with('success', 'To-Do berhasil diperbarui!');
-        } else {
-            return redirect()->back()->with('error', 'Gagal memperbarui To-Do.');
-        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Tugas berhasil diperbarui!'
+        ]);
     }
 
     function deleteTodo($id){
         $todo = ToDo::find($id);
 
         if(!$todo){
-            return redirect()->back()->with('error', 'To-Do tidak ditemukan.');
+            return response()->json(['error' => 'To-Do tidak ditemukan.'], 404);
         }else if($todo->user_id != Auth::id()){
-            return redirect()->back()->with('error', 'Anda tidak memiliki akses untuk menghapus To-Do ini.');
+            return response()->json(['error' => 'Anda tidak memiliki akses untuk menghapus To-Do ini.'], 403);
+        }
+
+        if($todo->foto_tugas && Storage::disk('public')->exists($todo->foto_tugas)) {
+            Storage::disk('public')->delete($todo->foto_tugas);
         }
 
         $todo->delete();
 
-        if($todo){
-            return redirect()->back()->with('success', 'To-Do berhasil dihapus!');
-        } else {
-            return redirect()->back()->with('error', 'Gagal menghapus To-Do.');
+        return response()->json([
+            'success' => true,
+            'message' => 'Tugas berhasil dihapus!'
+        ]);
+    }
+
+    function toggleStatus($id){
+        $todo = ToDo::find($id);
+
+        if(!$todo){
+            return response()->json(['error' => 'To-Do tidak ditemukan.'], 404);
+        }else if($todo->user_id != Auth::id()){
+            return response()->json(['error' => 'Anda tidak memiliki akses untuk mengubah To-Do ini.'], 403);
         }
+
+        // Validasi: Jika todo sudah selesai, tidak bisa diubah lagi
+        if($todo->status === 'selesai') {
+            return response()->json([
+                'error' => 'Tugas yang sudah selesai tidak dapat diubah statusnya lagi.'
+            ], 400);
+        }
+
+        // Toggle status dari belum_dikerjakan/terlambat ke selesai
+        $todo->status = 'selesai';
+        $todo->tanggal_diselesaikan = now();
+        $todo->save();
+
+        return response()->json([
+            'success' => true,
+            'status' => $todo->status,
+            'tanggal_diselesaikan' => $todo->tanggal_diselesaikan,
+            'message' => 'Tugas berhasil diselesaikan!'
+        ]);
     }
 }

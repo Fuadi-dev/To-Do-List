@@ -1,4 +1,3 @@
-{{-- filepath: d:\laragon\www\To-Do-List\backend\resources\views\index.blade.php --}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>TodoApp - Kelola Tugas Anda</title>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite('resources/css/app.css')
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -13,7 +13,7 @@
 <body class="bg-gray-50 min-h-screen" x-data="todoApp()">
     @include('components.navbar')
     
-    <!-- Alert Messages -->
+    {{-- <!-- Alert Messages -->
     @if(session('success'))
         <div x-data="{ show: true }" x-show="show" x-transition class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
             <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
@@ -34,7 +34,7 @@
                 </span>
             </div>
         </div>
-    @endif
+    @endif --}}
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Header Section -->
@@ -117,97 +117,293 @@
         </div>
 
         <!-- Todo Cards Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            @forelse($todos as $todo)
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-200">
-                    {{-- <!-- Todo Image -->
-                    @if($todo->foto_tugas)
-                        <div class="h-48 bg-gray-200 overflow-hidden cursor-pointer" @click="viewTodo({{ $todo->id }})">
-                            <img src="{{ asset('storage/' . $todo->foto_tugas) }}" 
-                                 alt="{{ $todo->judul_tugas }}"
-                                 class="w-full h-full object-cover">
-                        </div>
-                    @endif --}}
+  <!-- Todo Aktif -->
+        @php
+            $todosActive = $todos->filter(function($todo) {
+                return $todo->status !== 'selesai';
+            });
+            $todosCompleted = $todos->filter(function($todo) {
+                return $todo->status === 'selesai';
+            });
+            $todosOverdue = $todosActive->filter(function($todo) {
+                return $todo->status === 'terlambat';
+            });
+            $todosInProgress = $todosActive->filter(function($todo) {
+                return $todo->status === 'belum_dikerjakan';
+            });
+        @endphp
 
-                    <div class="p-6">
-                        <!-- Status Badge -->
-                        <div class="mb-3">
-                            @php
-                                $statusColors = [
-                                    'belum_dikerjakan' => 'bg-red-100 text-red-800',
-                                    'proses' => 'bg-yellow-100 text-yellow-800',
-                                    'selesai' => 'bg-green-100 text-green-800'
-                                ];
-                                $statusText = [
-                                    'belum_dikerjakan' => 'Belum Dikerjakan',
-                                    'proses' => 'Dalam Proses',
-                                    'selesai' => 'Selesai'
-                                ];
-                            @endphp
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $statusColors[$todo->status] ?? 'bg-gray-100 text-gray-800' }}">
-                                {{ $statusText[$todo->status] ?? $todo->status }}
-                            </span>
-                        </div>
+        <!-- Tugas Terlambat -->
+        @if($todosOverdue->count() > 0)
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-red-700 mb-4 flex items-center">
+                    <i class="fas fa-exclamation-triangle mr-2 text-red-600"></i>Tugas Terlambat
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    @foreach($todosOverdue as $todo)
+                        <div class="bg-red-50 rounded-lg shadow-sm border border-red-200 overflow-hidden hover:shadow-md transition-shadow duration-200">
+                            <div class="p-6">
+                                <!-- Status Badge -->
+                                <div class="mb-3">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i>Terlambat
+                                    </span>
+                                </div>
 
-                        <!-- Todo Title -->
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2 cursor-pointer" @click="viewTodo({{ $todo->id }})">{{ $todo->judul_tugas }}</h3>
-                        
-                        <!-- Todo Description -->
-                        <p class="text-gray-600 text-sm mb-4 line-clamp-3">{{ Str::limit($todo->deskripsi_tugas, 100) }}</p>
+                                <!-- Todo Title -->
+                                <h3 class="text-lg font-semibold text-gray-900 mb-2 cursor-pointer" @click="viewTodo({{ $todo->id }})">{{ $todo->judul_tugas }}</h3>
+                                
+                                <!-- Todo Description -->
+                                <p class="text-gray-600 text-sm mb-4 line-clamp-3">{{ Str::limit($todo->deskripsi_tugas, 100) }}</p>
 
-                        <!-- Categories -->
-                        @if($todo->categories->count() > 0)
-                            <div class="mb-4">
-                                <div class="flex flex-wrap gap-1">
-                                    @foreach($todo->categories as $category)
-                                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                                            {{ $category->name }}
-                                        </span>
-                                    @endforeach
+                                <!-- Categories -->
+                                @if($todo->categories->count() > 0)
+                                    <div class="mb-4">
+                                        <div class="flex flex-wrap gap-1">
+                                            @foreach($todo->categories as $category)
+                                                <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-700">
+                                                    {{ $category->name }}
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <!-- Deadline (Overdue) -->
+                                <div class="flex items-center text-sm text-red-600 mb-4 font-medium">
+                                    <i class="fas fa-calendar-times mr-2"></i>
+                                    Terlambat: {{ \Carbon\Carbon::parse($todo->tanggal_selesai)->diffForHumans() }}
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center space-x-3">
+                                        <!-- Checkbox untuk toggle status -->
+                                        <div class="flex items-center">
+                                            <input type="checkbox" 
+                                                   id="todo-overdue-{{ $todo->id }}"
+                                                   @change="confirmToggleStatus({{ $todo->id }}, $event)"
+                                                   class="w-5 h-5 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2 cursor-pointer">
+                                            <label for="todo-overdue-{{ $todo->id }}" 
+                                                   class="ml-2 text-sm text-gray-600 cursor-pointer">
+                                                Tandai Selesai
+                                            </label>
+                                        </div>
+
+                                        <div class="flex space-x-3">
+                                            <button @click="viewTodo({{ $todo->id }})" 
+                                                    class="text-blue-600 hover:text-blue-800 transition-colors duration-200 p-2">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button @click="editTodo({{ $todo->id }})" 
+                                                    class="text-indigo-600 hover:text-indigo-800 transition-colors duration-200 p-2">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button @click="deleteTodo({{ $todo->id }})" 
+                                                    class="text-red-600 hover:text-red-800 transition-colors duration-200 p-2">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-gray-400">
+                                        {{ \Carbon\Carbon::parse($todo->created_at)->diffForHumans() }}
+                                    </span>
                                 </div>
                             </div>
-                        @endif
-
-                        <!-- Deadline -->
-                        <div class="flex items-center text-sm text-gray-500 mb-4">
-                            <i class="fas fa-calendar-alt mr-2"></i>
-                            Deadline: {{ \Carbon\Carbon::parse($todo->tanggal_selesai)->format('d M Y') }}
                         </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
 
-                        <!-- Action Buttons -->
-                        <div class="flex justify-between items-center">
-                            <div class="flex space-x-3">
-                                <button @click="viewTodo({{ $todo->id }})" 
-                                        class="text-blue-600 hover:text-blue-800 transition-colors duration-200 p-2">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button @click="editTodo({{ $todo->id }})" 
-                                        class="text-indigo-600 hover:text-indigo-800 transition-colors duration-200 p-2">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button @click="deleteTodo({{ $todo->id }})" 
-                                        class="text-red-600 hover:text-red-800 transition-colors duration-200 p-2">
-                                    <i class="fas fa-trash"></i>
-                                </button>
+        <!-- Tugas Aktif (yang belum terlambat) -->
+        @if($todosInProgress->count() > 0)
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                    <i class="fas fa-tasks mr-2 text-indigo-600"></i>Tugas Aktif
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    @foreach($todosInProgress as $todo)
+                        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow duration-200">
+                            <div class="p-6">
+                                <!-- Status Badge -->
+                                <div class="mb-3">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        Belum Dikerjakan
+                                    </span>
+                                </div>
+
+                                <!-- Todo Title -->
+                                <h3 class="text-lg font-semibold text-gray-900 mb-2 cursor-pointer" @click="viewTodo({{ $todo->id }})">{{ $todo->judul_tugas }}</h3>
+                                
+                                <!-- Todo Description -->
+                                <p class="text-gray-600 text-sm mb-4 line-clamp-3">{{ Str::limit($todo->deskripsi_tugas, 100) }}</p>
+
+                                <!-- Categories -->
+                                @if($todo->categories->count() > 0)
+                                    <div class="mb-4">
+                                        <div class="flex flex-wrap gap-1">
+                                            @foreach($todo->categories as $category)
+                                                <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                                                    {{ $category->name }}
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <!-- Deadline -->
+                                <div class="flex items-center text-sm text-gray-400 mb-4">
+                                    <i class="fas fa-calendar-alt mr-2"></i>
+                                    Deadline: {{ \Carbon\Carbon::parse($todo->tanggal_selesai)->format('d M Y') }}
+                                    @if(\Carbon\Carbon::parse($todo->tanggal_selesai)->isToday())
+                                        <span class="ml-2 text-orange-600 font-medium">(Hari ini!)</span>
+                                    @elseif(\Carbon\Carbon::parse($todo->tanggal_selesai)->isTomorrow())
+                                        <span class="ml-2 text-yellow-600 font-medium">(Besok)</span>
+                                    @endif
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center space-x-3">
+                                        <!-- Checkbox untuk toggle status -->
+                                        <div class="flex items-center">
+                                            <input type="checkbox" 
+                                                   id="todo-{{ $todo->id }}"
+                                                   @change="confirmToggleStatus({{ $todo->id }}, $event)"
+                                                   class="w-5 h-5 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2 cursor-pointer">
+                                            <label for="todo-{{ $todo->id }}" 
+                                                   class="ml-2 text-sm text-gray-600 cursor-pointer">
+                                                Tandai Selesai
+                                            </label>
+                                        </div>
+
+                                        <div class="flex space-x-3">
+                                            <button @click="viewTodo({{ $todo->id }})" 
+                                                    class="text-blue-600 hover:text-blue-800 transition-colors duration-200 p-2">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button @click="editTodo({{ $todo->id }})" 
+                                                    class="text-indigo-600 hover:text-indigo-800 transition-colors duration-200 p-2">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <button @click="deleteTodo({{ $todo->id }})" 
+                                                    class="text-red-600 hover:text-red-800 transition-colors duration-200 p-2">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-gray-400">
+                                        {{ \Carbon\Carbon::parse($todo->created_at)->diffForHumans() }}
+                                    </span>
+                                </div>
                             </div>
-                            <span class="text-xs text-gray-400">
-                                {{ \Carbon\Carbon::parse($todo->created_at)->diffForHumans() }}
-                            </span>
                         </div>
-                    </div>
+                    @endforeach
                 </div>
-            @empty
-                <div class="col-span-full text-center py-12">
-                    <i class="fas fa-tasks text-gray-300 text-6xl mb-4"></i>
-                    <h3 class="text-lg font-medium text-gray-900 mb-2">Belum ada tugas</h3>
-                    <p class="text-gray-500 mb-4">Mulai dengan menambahkan tugas pertama Anda!</p>
-                    <button @click="openAddModal()" 
-                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200">
-                        Tambah Tugas
-                    </button>
+            </div>
+        @endif
+
+        <!-- Todo Selesai -->
+        @if($todosCompleted->count() > 0)
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                    <i class="fas fa-check-circle mr-2 text-green-600"></i>Tugas Selesai
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    @foreach($todosCompleted as $todo)
+                        <div class="bg-gray-50 rounded-lg shadow-sm border border-gray-200 overflow-hidden opacity-75">
+                            <div class="p-6">
+                                <!-- Status Badge -->
+                                <div class="mb-3">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <i class="fas fa-check mr-1"></i>Selesai
+                                    </span>
+                                </div>
+
+                                <!-- Todo Title (dengan strikethrough) -->
+                                <h3 class="text-lg font-semibold text-gray-600 mb-2 cursor-pointer line-through" @click="viewTodo({{ $todo->id }})">{{ $todo->judul_tugas }}</h3>
+                                
+                                <!-- Todo Description -->
+                                <p class="text-gray-500 text-sm mb-4 line-clamp-3">{{ Str::limit($todo->deskripsi_tugas, 100) }}</p>
+
+                                <!-- Categories -->
+                                @if($todo->categories->count() > 0)
+                                    <div class="mb-4">
+                                        <div class="flex flex-wrap gap-1">
+                                            @foreach($todo->categories as $category)
+                                                <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-600">
+                                                    {{ $category->name }}
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <!-- Deadline -->
+                                <div class="flex items-center text-sm text-gray-400 mb-4">
+                                    <i class="fas fa-calendar-check mr-2"></i>
+                                    @if($todo->tanggal_diselesaikan)
+                                        Selesai pada: {{ \Carbon\Carbon::parse($todo->tanggal_diselesaikan)->format('d M Y H:i') }}
+                                    @else
+                                        Deadline: {{ \Carbon\Carbon::parse($todo->tanggal_selesai)->format('d M Y') }}
+                                    @endif
+                                </div>
+
+                                <!-- Action Buttons (hanya view dan delete untuk todo selesai) -->
+                                <div class="flex justify-between items-center">
+                                    <div class="flex items-center space-x-3">
+                                        <!-- Checkbox untuk todo selesai (disabled) -->
+                                        <div class="flex items-center">
+                                            <input type="checkbox" 
+                                                   id="todo-completed-{{ $todo->id }}"
+                                                   checked
+                                                   disabled
+                                                   class="w-5 h-5 text-green-600 bg-gray-100 border-gray-300 rounded cursor-not-allowed opacity-60">
+                                            <label for="todo-completed-{{ $todo->id }}" 
+                                                   class="ml-2 text-sm text-gray-500 cursor-not-allowed">
+                                                Selesai
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="flex space-x-3">
+                                            <button @click="viewTodo({{ $todo->id }})" 
+                                                    class="text-blue-600 hover:text-blue-800 transition-colors duration-200 p-2">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button @click="deleteTodo({{ $todo->id }})" 
+                                                    class="text-red-600 hover:text-red-800 transition-colors duration-200 p-2">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            <span class="text-gray-400 p-2 cursor-not-allowed" title="Tugas selesai tidak dapat diedit">
+                                                <i class="fas fa-edit"></i>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-gray-400">
+                                        {{ \Carbon\Carbon::parse($todo->created_at)->diffForHumans() }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
                 </div>
-            @endforelse
-        </div>
+            </div>
+        @endif
+
+        <!-- Jika tidak ada todo sama sekali -->
+        @if($todosActive->count() == 0 && $todosCompleted->count() == 0)
+            <div class="col-span-full text-center py-12">
+                <i class="fas fa-tasks text-gray-300 text-6xl mb-4"></i>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Belum ada tugas</h3>
+                <p class="text-gray-500 mb-4">Mulai dengan menambahkan tugas pertama Anda!</p>
+                <button @click="openAddModal()" 
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200">
+                    Tambah Tugas
+                </button>
+            </div>
+        @endif
+      
 
         <!-- Pagination -->
         @if($todos->hasPages())
@@ -227,7 +423,7 @@
                         <i class="fas fa-times text-xl"></i>
                     </button>
                 </div>
-                <form method="POST" action="{{ route('todo.add') }}" enctype="multipart/form-data" class="space-y-4">
+                <form @submit="submitAddForm" method="POST" action="{{ route('todo.add') }}" enctype="multipart/form-data" class="space-y-4">
                     @csrf
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Foto Tugas</label>
@@ -261,15 +457,14 @@
                         <input type="date" name="tanggal_selesai" required min="{{ date('Y-m-d') }}"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                     </div>
-                    <div>
+                    {{-- <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Status *</label>
                         <select name="status" required
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                             <option value="belum_dikerjakan">Belum Dikerjakan</option>
-                            <option value="proses">Dalam Proses</option>
                             <option value="selesai">Selesai</option>
                         </select>
-                    </div>
+                    </div> --}}
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
                         <div class="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
@@ -307,7 +502,7 @@
                         <i class="fas fa-times text-xl"></i>
                     </button>
                 </div>
-                <form :action="`/todo/${selectedTodo.id}/edit`" method="POST" enctype="multipart/form-data" class="space-y-4">
+                <form @submit="submitEditForm" :action="`/todo/${selectedTodo.id}/edit`" method="POST" enctype="multipart/form-data" class="space-y-4">
                     @csrf
                     @method('PUT')
                     <div>
@@ -354,15 +549,14 @@
                         <input type="date" name="tanggal_selesai" :value="selectedTodo.tanggal_selesai" required
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                     </div>
-                    <div>
+                    {{-- <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Status *</label>
                         <select name="status" required
                                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                             <option value="belum_dikerjakan" :selected="selectedTodo.status === 'belum_dikerjakan'">Belum Dikerjakan</option>
-                            <option value="proses" :selected="selectedTodo.status === 'proses'">Dalam Proses</option>
                             <option value="selesai" :selected="selectedTodo.status === 'selesai'">Selesai</option>
                         </select>
-                    </div>
+                    </div> --}}
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
                         <div class="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
@@ -416,7 +610,6 @@
                         <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
                               :class="{
                                 'bg-red-100 text-red-800': selectedTodo.status === 'belum_dikerjakan',
-                                'bg-yellow-100 text-yellow-800': selectedTodo.status === 'proses',
                                 'bg-green-100 text-green-800': selectedTodo.status === 'selesai'
                               }"
                               x-text="getStatusText(selectedTodo.status)">
@@ -452,8 +645,16 @@
                             <p class="text-gray-600" x-text="formatDate(selectedTodo.created_at)"></p>
                         </div>
                         <div>
-                            <h5 class="text-sm font-medium text-gray-700 mb-1">Deadline:</h5>
-                            <p class="text-gray-600" x-text="formatDate(selectedTodo.tanggal_selesai)"></p>
+                            <h5 class="text-sm font-medium text-gray-700 mb-1">
+                                <span x-show="selectedTodo.status === 'selesai' && selectedTodo.tanggal_diselesaikan">Selesai pada:</span>
+                                <span x-show="selectedTodo.status !== 'selesai' || !selectedTodo.tanggal_diselesaikan">Deadline:</span>
+                            </h5>
+                            <p class="text-gray-600">
+                                <span x-show="selectedTodo.status === 'selesai' && selectedTodo.tanggal_diselesaikan" 
+                                      x-text="formatDateTime(selectedTodo.tanggal_diselesaikan)"></span>
+                                <span x-show="selectedTodo.status !== 'selesai' || !selectedTodo.tanggal_diselesaikan" 
+                                      x-text="formatDate(selectedTodo.tanggal_selesai)"></span>
+                            </p>
                         </div>
                     </div>
 
@@ -516,6 +717,11 @@
                 editTodo(todoId) {
                     const todo = this.todos.find(t => t.id === todoId);
                     if (todo) {
+                        // Cek apakah todo sudah selesai
+                        if (todo.status === 'selesai') {
+                            this.showNotification('Tugas yang sudah selesai tidak dapat diedit!', 'error');
+                            return;
+                        }
                         this.selectedTodo = { ...todo };
                         this.showEditModal = true;
                         this.showViewModal = false;
@@ -588,24 +794,111 @@
                     if (fileInput) fileInput.value = '';
                 },
 
-                deleteTodo(todoId) {
-                    if (confirm('Apakah Anda yakin ingin menghapus tugas ini?')) {
-                        const form = document.createElement('form');
-                        form.method = 'POST';
-                        form.action = `/todo/${todoId}/delete`;
-                        form.innerHTML = `
-                            @csrf
-                            @method('DELETE')
-                        `;
-                        document.body.appendChild(form);
-                        form.submit();
+                async submitAddForm(event) {
+                    event.preventDefault();
+                    const form = event.target;
+                    const formData = new FormData(form);
+
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST',
+                            body: formData,
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            }
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.showNotification(data.message, 'success');
+                            this.closeAddModal();
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            this.showNotification(data.error || 'Terjadi kesalahan', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        this.showNotification('Terjadi kesalahan saat menambahkan tugas', 'error');
+                    }
+                },
+
+                async submitEditForm(event) {
+                    event.preventDefault();
+                    const form = event.target;
+                    const formData = new FormData(form);
+                    
+                    // Add method spoofing for PUT request
+                    formData.append('_method', 'PUT');
+
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST', // Laravel menggunakan POST dengan method spoofing
+                            body: formData,
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            }
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.showNotification(data.message, 'success');
+                            this.closeEditModal();
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            this.showNotification(data.error || 'Terjadi kesalahan', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        this.showNotification('Terjadi kesalahan saat memperbarui tugas', 'error');
+                    }
+                },
+
+                async deleteTodo(todoId) {
+                    const confirmed = await this.showConfirmationModal(
+                        'Konfirmasi Hapus Tugas',
+                        'Apakah Anda yakin ingin menghapus tugas ini?',
+                        'Tugas yang dihapus tidak dapat dikembalikan.',
+                        'Ya, Hapus',
+                        'Batal'
+                    );
+
+                    if (!confirmed) return;
+
+                    try {
+                        const response = await fetch(`/todo/${todoId}/delete`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            }
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.showNotification(data.message, 'success');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            this.showNotification(data.error || 'Terjadi kesalahan', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        this.showNotification('Terjadi kesalahan saat menghapus tugas', 'error');
                     }
                 },
 
                 getStatusText(status) {
                     const statusMap = {
                         'belum_dikerjakan': 'Belum Dikerjakan',
-                        'proses': 'Dalam Proses',
+                        'terlambat': 'Terlambat',
                         'selesai': 'Selesai'
                     };
                     return statusMap[status] || status;
@@ -618,25 +911,190 @@
                         day: 'numeric' 
                     };
                     return new Date(dateString).toLocaleDateString('id-ID', options);
+                },
+
+                formatDateTime(dateString) {
+                    const options = { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    };
+                    return new Date(dateString).toLocaleDateString('id-ID', options);
+                },
+
+                async confirmToggleStatus(todoId, event) {
+                    // Cek status todo sebelum konfirmasi
+                    const todo = this.todos.find(t => t.id === todoId);
+                    
+                    if (todo && todo.status === 'selesai') {
+                        this.showNotification('Tugas yang sudah selesai tidak dapat diubah statusnya lagi.', 'error');
+                        // Reset checkbox ke checked karena todo sudah selesai
+                        event.target.checked = true;
+                        return;
+                    }
+
+                    // Untuk todo yang belum selesai, tampilkan konfirmasi
+                    const confirmed = await this.showConfirmationModal(
+                        'Konfirmasi Penyelesaian Tugas',
+                        `Apakah Anda yakin ingin menandai tugas "${todo.judul_tugas}" sebagai selesai?`,
+                        'Tugas yang sudah diselesaikan tidak dapat diubah kembali.',
+                        'Ya, Selesaikan',
+                        'Batal'
+                    );
+
+                    if (confirmed) {
+                        this.toggleTodoStatus(todoId);
+                    } else {
+                        // Reset checkbox ke unchecked karena user membatalkan
+                        event.target.checked = false;
+                    }
+                },
+
+                showConfirmationModal(title, message, warning, confirmText, cancelText) {
+                    return new Promise((resolve) => {
+                        // Create modal element
+                        const modal = document.createElement('div');
+                        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                        modal.innerHTML = `
+                            <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+                                <div class="flex items-center mb-4">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-exclamation-triangle text-yellow-400 text-2xl"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h3 class="text-lg font-medium text-gray-900">${title}</h3>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <p class="text-sm text-gray-600 mb-2">${message}</p>
+                                    <p class="text-xs text-red-600 font-medium">${warning}</p>
+                                </div>
+                                
+                                <div class="flex justify-end space-x-3">
+                                    <button id="cancelBtn" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors duration-200">
+                                        ${cancelText}
+                                    </button>
+                                    <button id="confirmBtn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200">
+                                        <i class="fas fa-check mr-2"></i>${confirmText}
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+
+                        document.body.appendChild(modal);
+                        document.body.style.overflow = 'hidden';
+
+                        // Add event listeners
+                        const confirmBtn = modal.querySelector('#confirmBtn');
+                        const cancelBtn = modal.querySelector('#cancelBtn');
+
+                        const cleanup = () => {
+                            document.body.removeChild(modal);
+                            document.body.style.overflow = 'auto';
+                        };
+
+                        confirmBtn.addEventListener('click', () => {
+                            cleanup();
+                            resolve(true);
+                        });
+
+                        cancelBtn.addEventListener('click', () => {
+                            cleanup();
+                            resolve(false);
+                        });
+
+                        // Close on click outside
+                        modal.addEventListener('click', (e) => {
+                            if (e.target === modal) {
+                                cleanup();
+                                resolve(false);
+                            }
+                        });
+
+                        // Close on Escape key
+                        const escapeHandler = (e) => {
+                            if (e.key === 'Escape') {
+                                cleanup();
+                                resolve(false);
+                                document.removeEventListener('keydown', escapeHandler);
+                            }
+                        };
+                        document.addEventListener('keydown', escapeHandler);
+                    });
+                },
+
+                async toggleTodoStatus(todoId) {
+                    try {
+                        const response = await fetch(`/todo/${todoId}/toggle-status`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}'
+                            }
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            // Update todo status in local data
+                            const todo = this.todos.find(t => t.id === todoId);
+                            if (todo) {
+                                todo.status = data.status;
+                                todo.tanggal_diselesaikan = data.tanggal_diselesaikan;
+                            }
+
+                            // Show success message
+                            this.showNotification(data.message, 'success');
+
+                            // Refresh page to update the UI layout (active vs completed sections)
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        } else {
+                            this.showNotification(data.error || 'Terjadi kesalahan', 'error');
+                            
+                            // Reset checkbox jika terjadi error
+                            const checkbox = document.getElementById(`todo-${todoId}`);
+                            if (checkbox) checkbox.checked = false;
+                        }
+                    } catch (error) {
+                        console.error('Error:', error);
+                        this.showNotification('Terjadi kesalahan saat mengubah status', 'error');
+                        
+                        // Reset checkbox jika terjadi error
+                        const checkbox = document.getElementById(`todo-${todoId}`);
+                        if (checkbox) checkbox.checked = false;
+                    }
+                },
+
+                showNotification(message, type = 'success') {
+                    // Create notification element
+                    const notification = document.createElement('div');
+                    notification.className = `fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-300 ${
+                        type === 'success' ? 'bg-green-100 border border-green-400 text-green-700' : 'bg-red-100 border border-red-400 text-red-700'
+                    }`;
+                    notification.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>
+                            <span>${message}</span>
+                            <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-lg">&times;</button>
+                        </div>
+                    `;
+
+                    document.body.appendChild(notification);
+
+                    // Auto remove after 3 seconds
+                    setTimeout(() => {
+                        if (notification.parentElement) {
+                            notification.remove();
+                        }
+                    }, 3000);
                 }
             }
         }
-
-        // Close modals when pressing Escape key
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Escape') {
-                const alpineData = Alpine.$data(document.body);
-                if (alpineData.showImageModal) {
-                    alpineData.closeImageModal();
-                } else if (alpineData.showViewModal) {
-                    alpineData.closeViewModal();
-                } else if (alpineData.showEditModal) {
-                    alpineData.closeEditModal();
-                } else if (alpineData.showAddModal) {
-                    alpineData.closeAddModal();
-                }
-            }
-        });
     </script>
 </body>
 </html>

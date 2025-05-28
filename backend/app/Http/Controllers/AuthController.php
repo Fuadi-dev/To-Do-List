@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Hash;
 class AuthController extends Controller
 {
     public function login(){
+        if(Auth::check()){
+            return redirect('/');
+        }
         return view('auth.login');
     }
     function loginPost(Request $request){
@@ -27,6 +30,9 @@ class AuthController extends Controller
     }
 
     public function register(){
+        if(Auth::check()){
+            return redirect('/');
+        }
         return view('auth.register');
     }
     function registerPost(Request $request){
@@ -52,7 +58,7 @@ class AuthController extends Controller
                 if($create){
                     $credentials = $request->only("email", "password");
                     if(Auth::attempt($credentials)){
-                        return redirect()->route("dashboard")->with("success", "Berhasil membuat user sekaligus login");
+                        return redirect('/')->with("success", "Berhasil membuat user sekaligus login");
                     }else{
                         Auth::logout();
                         return redirect()->back()->with("error", "Gagal Login tetapi user berhasil di buat, silahkan login di halaman login");

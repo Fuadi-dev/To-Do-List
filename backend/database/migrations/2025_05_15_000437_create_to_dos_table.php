@@ -17,9 +17,9 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->string('judul_tugas');
             $table->text('deskripsi_tugas');
-            $table->date('tanggal_tugas');
             $table->date('tanggal_selesai')->nullable();
-            $table->enum('status', ['belum_dikerjakan', 'proses', 'selesai'])->default('belum_dikerjakan');
+            $table->dateTime('tanggal_diselesaikan')->nullable();
+            $table->enum('status', ['belum_dikerjakan', 'terlambat', 'selesai'])->default('belum_dikerjakan');
             $table->timestamps();
         });
     }

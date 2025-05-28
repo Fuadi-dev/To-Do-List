@@ -17,12 +17,18 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'To-Do List App',
+      title: 'TaskMaster - Todo App',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.deepPurple.shade700,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
       ),
       home: const AuthCheckPage(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -47,9 +53,8 @@ class _AuthCheckPageState extends State<AuthCheckPage> {
   Future<void> _checkIfLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-    
+
     if (token != null) {
-      // Validasi token dengan mencoba mengakses API yang terproteksi
       try {
         final response = await http.get(
           Uri.parse('$base_url/user'),
@@ -58,7 +63,7 @@ class _AuthCheckPageState extends State<AuthCheckPage> {
             'Authorization': 'Bearer $token',
           },
         );
-        
+
         if (response.statusCode == 200) {
           setState(() {
             _isLoggedIn = true;
@@ -67,12 +72,11 @@ class _AuthCheckPageState extends State<AuthCheckPage> {
           return;
         }
       } catch (e) {
-        // Token tidak valid atau terjadi error jaringan
-        await prefs.remove('token'); // Hapus token yang tidak valid
+        await prefs.remove('token');
+        await prefs.remove('user_data');
       }
     }
-    
-    // Jika sampai di sini, berarti token tidak ada atau tidak valid
+
     setState(() {
       _isLoggedIn = false;
       _isLoading = false;
@@ -82,17 +86,43 @@ class _AuthCheckPageState extends State<AuthCheckPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
+      return Scaffold(
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Colors.deepPurple.shade700, Colors.deepPurple.shade300],
+            ),
+          ),
+          child: const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'TaskMaster',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Memuat aplikasi...',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }
 
-    if (_isLoggedIn) {
-      return const HomePage();
-    } else {
-      return const LoginPage();
-    }
+    return _isLoggedIn ? const HomePage() : const LoginPage();
   }
 }
