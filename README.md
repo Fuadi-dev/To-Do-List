@@ -90,7 +90,7 @@
 ## Demo
 
 **Video demo penggunaan aplikasi:**  
-<video src="assets/demo.mp4" controls width="500"></video>
+<video src="demo.mp4" controls width="500"></video>
 
 ## Identitas Pembuat
 
