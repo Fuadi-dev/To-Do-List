@@ -92,8 +92,8 @@
 **Video demo penggunaan aplikasi:**  
 <div align="center">
   <video width="700" controls>
-    <source src="https://github.com/Fuadi-dev/To-Do-List/releases/tag/v1.0/demo.mp4" type="video/mp4">
-    <p>Browser Anda tidak mendukung video HTML5. <a href="https://github.com/Fuadi-dev/To-Do-List/releases/download/v1.0/demo.mp4">Download video</a></p>
+    <source src="./demo.mp4" type="video/mp4">
+    <p>Browser Anda tidak mendukung video HTML5. <a href="./demo.mp4">Download video</a></p>
   </video>
 </div>
 
