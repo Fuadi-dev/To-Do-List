@@ -2,7 +2,7 @@
 
 ## Deskripsi Aplikasi
 
-**To-Do List** adalah aplikasi manajemen tugas yang memungkinkan pengguna untuk mencatat, mengorganisir, dan melacak tugas-tugas harian mereka. Aplikasi ini dirancang untuk memudahkan pengguna dalam mengelola aktivitas sehari-hari dengan fitur-fitur seperti pembuatan daftar tugas, penandaan tugas selesai, pengelompokan tugas, dan pengingat.
+**To-Do List** adalah aplikasi manajemen tugas yang memungkinkan pengguna untuk mencatat, mengorganisir, dan melacak tugas-tugas harian mereka. Aplikasi ini dirancang untuk memudahkan pengguna dalam mengatur aktivitas sehari-hari dengan fitur yang lengkap dan mudah digunakan.
 
 ### Bagian-bagian Aplikasi
 - **Manajemen Tugas**: Tambah, edit, hapus, dan tandai tugas sebagai selesai.
@@ -90,12 +90,16 @@
 ## Demo
 
 **Video demo penggunaan aplikasi:**  
+
 <div align="center">
   <video width="700" controls>
     <source src="https://github.com/Fuadi-dev/To-Do-List/releases/download/v1.0/demo.mp4" type="video/mp4">
     <p>Browser Anda tidak mendukung video HTML5. <a href="https://github.com/Fuadi-dev/To-Do-List/releases/download/v1.0/demo.mp4">Download video</a></p>
   </video>
 </div>
+
+*Klik play untuk melihat demo aplikasi To-Do List*
+
 ## Identitas Pembuat
 
 - **Nama**: Daiyan Nur Fuadi
