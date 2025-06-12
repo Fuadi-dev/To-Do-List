@@ -22,8 +22,6 @@
    Menampilkan detail dari setiap tugas, deadline, dan catatan tambahan.
 5. **Halaman Kelola Kategori**  
    Mengelola kategori atau grup tugas.
-6. **Halaman Profil**  
-   Mengelola data pengguna.
 
 ## Database yang Digunakan
 
