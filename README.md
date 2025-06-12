@@ -92,7 +92,7 @@
 **Video demo penggunaan aplikasi:**  
 <div align="center">
   <video width="700" controls>
-    <source src="./demo.mp4" type="video/mp4">
+    <source src="./demo.mp4.mp4" type="video/mp4">
     <p>Browser Anda tidak mendukung video HTML5. <a href="./demo.mp4">Download video</a></p>
   </video>
 </div>
