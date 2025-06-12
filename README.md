@@ -53,13 +53,14 @@
 2. **Install Dependencies**
     - Untuk Laravel (Backend):
         ```bash
+        cd backend
         composer install
         cp .env.example .env
         php artisan key:generate
         ```
     - Untuk Flutter (Mobile):
         ```bash
-        cd mobile
+        cd frontend
         flutter pub get
         ```
 
