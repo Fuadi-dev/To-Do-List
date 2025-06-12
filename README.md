@@ -89,13 +89,7 @@
 ## Demo
 
 **Video demo penggunaan aplikasi:**  
-Ukuran video yang kecil dapat ditampilkan langsung di bawah ini. Untuk video dengan ukuran lebih besar, silakan akses melalui link berikut:
-
-[Demo Video (Google Drive)](https://drive.google.com/file/d/your-demo-link)  
-atau  
-[Demo Video (YouTube)](https://youtu.be/your-demo-link)
-
-> Untuk membuat video demo yang berukuran kecil, gunakan Snipping Tools Video (Windows 11) dan simpan dalam format mp4/webm dengan durasi pendek.
+<video src="assets/demo.mp4" controls width="500"></video>
 
 ## Identitas Pembuat
 
